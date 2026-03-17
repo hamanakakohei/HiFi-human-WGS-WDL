@@ -1,0 +1,59 @@
+--- workflows_3.1.0/tertiary/tertiary.wdl.original	2025-11-29 19:26:50.474293011 +0900
++++ workflows_3.1.0/tertiary/tertiary.wdl	2025-11-29 19:26:50.489293044 +0900
+@@ -336,6 +336,7 @@
+ 
+   Int threads   = 8
+   Int mem_gb    = 16
++  Int memory    = ceil(mem_gb / threads) + 2 # edited by hamanaka
+   Int disk_size = ceil((size(vcf, "GB") + size(reference, "GB") + size(gnotate_files, "GB") + size(gff, "GB") + size(lof_lookup, "GB") + size(clinvar_lookup, "GB") + size(phrank_lookup, "GB")) * 2 + 20)
+ 
+   command <<<
+@@ -455,7 +456,9 @@
+   runtime {
+     docker: "~{runtime_attributes.container_registry}/slivar:sha256f71a27f756e2d69ec30949cbea97c54abbafde757562a98ef965f21a28aa8eaa"
+     cpu: threads
+-    memory: mem_gb + " GiB"
++    #memory: mem_gb + " GiB"
++    memory: "${memory}GB" # edited by hamanaka
++    sge_queue: runtime_attributes.sge_queue # edited by hamanaka
+     disk: disk_size + " GB"
+     disks: "local-disk " + disk_size + " HDD"
+     preemptible: runtime_attributes.preemptible_tries
+@@ -512,6 +515,7 @@
+ 
+   Int threads   = 2
+   Int mem_gb    = 16
++  Int memory    = ceil(mem_gb / threads) + 2 # edited by hamanaka
+   Int disk_size = ceil(size(sv_vcf, "GB") * 2 + 20)
+ 
+   String out_prefix = basename(sv_vcf, ".vcf.gz")
+@@ -555,7 +559,9 @@
+   runtime {
+     docker: "~{runtime_attributes.container_registry}/svpack:sha256628e9851e425ed8044a907d33de04043d1ef02d4d2b2667cf2e9a389bb011eba"
+     cpu: threads
+-    memory: mem_gb + " GiB"
++    #memory: mem_gb + " GiB"
++    memory: "${memory}GB" # edited by hamanaka
++    sge_queue: runtime_attributes.sge_queue # edited by hamanaka
+     disk: disk_size + " GB"
+     disks: "local-disk " + disk_size + " HDD"
+     preemptible: runtime_attributes.preemptible_tries
+@@ -617,6 +623,7 @@
+ 
+   Int threads   = 2
+   Int mem_gb    = 4
++  Int memory    = ceil(mem_gb / threads) + 2 # edited by hamanaka
+   Int disk_size = ceil((size(filtered_vcf, "GB") + size(lof_lookup, "GB") + size(clinvar_lookup, "GB") + size(phrank_lookup, "GB")) * 2 + 20)
+ 
+   command <<<
+@@ -655,7 +662,9 @@
+   runtime {
+     docker: "~{runtime_attributes.container_registry}/slivar:sha256f71a27f756e2d69ec30949cbea97c54abbafde757562a98ef965f21a28aa8eaa"
+     cpu: threads
+-    memory: mem_gb + " GiB"
++    #memory: mem_gb + " GiB"
++    memory: "${memory}GB" # edited by hamanaka
++    sge_queue: runtime_attributes.sge_queue # edited by hamanaka
+     disk: disk_size + " GB"
+     disks: "local-disk " + disk_size + " HDD"
+     preemptible: runtime_attributes.preemptible_tries

@@ -1,0 +1,31 @@
+#!/bin/bash
+#$ -S /bin/bash
+#$ -N hifi_03
+#$ -cwd
+#$ -q your.q
+#$ -pe OpenMP 4
+#$ -l s_vmem=64G
+#$ -l h="!bad_node"
+#$ -o logs/03/$TASK_ID.o.log
+#$ -e logs/03/$TASK_ID.e.log
+set -euo pipefail
+source /path/to/HiFi-human-WGS-WDL-3.1.0/env.sh
+
+
+CONF=cromwell.examples.edit.conf
+CROMWELL=cromwell-86.jar
+
+WDL=$1
+INPUT_JSON_LIST=$2
+
+read INPUT_JSON < <(sed -n "${SGE_TASK_ID}p" "$INPUT_JSON_LIST")
+
+
+java \
+  -Xms2g \
+  -Xmx16g \
+  -XX:ActiveProcessorCount=4 \
+  -Dconfig.file=$CONF \
+  -jar $CROMWELL \
+  run $WDL \
+  --inputs $INPUT_JSON

@@ -93,6 +93,128 @@ workflow tertiary_analysis {
   Map[String, String] ref_map      = read_map(ref_map_file)
   Map[String, String] tertiary_map = read_map(tertiary_map_file)
 
+  Array[String] csq_columns = [
+    'Allele',
+    'Consequence',
+    'IMPACT',
+    'SYMBOL',
+    'Gene',
+    'Feature_type',
+    'Feature',
+    'BIOTYPE',
+    'EXON',
+    'INTRON',
+    'HGVSc',
+    'HGVSp',
+    'cDNA_position',
+    'CDS_position',
+    'Protein_position',
+    'Amino_acids',
+    'Codons',
+    'Existing_variation',
+    'DISTANCE',
+    'STRAND',
+    'FLAGS',
+    'VARIANT_CLASS',
+    'SYMBOL_SOURCE',
+    'HGNC_ID',
+    'CANONICAL',
+    'MANE',
+    'MANE_SELECT',
+    'MANE_PLUS_CLINICAL',
+    'TSL',
+    'APPRIS',
+    'CCDS',
+    'ENSP',
+    'SWISSPROT',
+    'TREMBL',
+    'UNIPARC',
+    'UNIPROT_ISOFORM',
+    'GIVEN_REF',
+    'USED_REF',
+    'BAM_EDIT',
+    'GENE_PHENO',
+    'SIFT',
+    'PolyPhen',
+    'DOMAINS',
+    'miRNA',
+    'HGVS_OFFSET',
+    'AF',
+    'EAS_AF',
+    'gnomADe_AF',
+    'gnomADe_EAS_AF',
+    'gnomADg_AF',
+    'gnomADg_EAS_AF',
+    'MAX_AF',
+    'MAX_AF_POPS',
+    'CLIN_SIG',
+    'SOMATIC',
+    'PHENO',
+    'PUBMED',
+    'MOTIF_NAME',
+    'MOTIF_POS',
+    'HIGH_INF_POS',
+    'MOTIF_SCORE_CHANGE',
+    'TRANSCRIPTION_FACTORS',
+    'am_class',
+    'am_pathogenicity',
+    'REVEL',
+    'SpliceAI_pred_DP_AG',
+    'SpliceAI_pred_DP_AL',
+    'SpliceAI_pred_DP_DG',
+    'SpliceAI_pred_DP_DL',
+    'SpliceAI_pred_DS_AG',
+    'SpliceAI_pred_DS_AL',
+    'SpliceAI_pred_DS_DG',
+    'SpliceAI_pred_DS_DL',
+    'SpliceAI_pred_SYMBOL',
+    '5UTR_annotation',
+    '5UTR_consequence',
+    'Existing_InFrame_oORFs',
+    'Existing_OutOfFrame_oORFs',
+    'Existing_uORFs',
+    'RiboseqORFs_CDS_position',
+    'RiboseqORFs_amino_acids',
+    'RiboseqORFs_cDNA_position',
+    'RiboseqORFs_codons',
+    'RiboseqORFs_consequences',
+    'RiboseqORFs_id',
+    'RiboseqORFs_impact',
+    'RiboseqORFs_protein_position'
+  ]
+    #'TSSDistance',
+    #'Enformer_SAD',
+    #'Enformer_SAR',
+    #'HGMD',
+    #'HGMD_CLASS',
+    #'HGMD_PHEN',
+    #'NCBN',
+    #'NCBN_AF_JPN',
+    #'ClinVar',
+    #'ClinVar_CLNSIG',
+    #'ClinVar_CLNREVSTAT',
+    #'ClinVar_CLNDN',
+
+  call bcftools_norm {
+    input:
+      vcf                = small_variant_vcf,
+      vcf_index          = small_variant_vcf_index,
+      reference          = ref_map["fasta"],               # !FileCoercion
+      reference_index    = ref_map["fasta_index"],         # !FileCoercion
+      runtime_attributes = default_runtime_attributes
+  }
+  
+  call vcfanno {
+    input:
+      vcf                = bcftools_norm.norm_vcf,
+      vcf_index          = bcftools_norm.norm_vcf_index,
+      vcf_annot_source   = tertiary_map["vcf_annot_source"],
+      vcf_annot_source_index = tertiary_map["vcf_annot_source_index"],
+      lua                = tertiary_map["vcfanno_lua"],
+      runtime_attributes = default_runtime_attributes
+      #toml               = tertiary_map["vcfanno_toml"],
+  }
+
   call Write_phrank.write_phrank {
     input:
       phenotypes         = phenotypes,
@@ -124,12 +246,12 @@ workflow tertiary_analysis {
     String slivar_ac_expr = "INFO.~{gnotate_prefix}_ac <= ~{tertiary_map['slivar_max_ac']}"
     # info fields for slivar tsv
     Array[String] info_fields = ["~{gnotate_prefix}_af","~{gnotate_prefix}_nhomalt","~{gnotate_prefix}_ac"]
-	}
+  }
 
   call slivar_small_variant {
     input:
-      vcf                = small_variant_vcf,
-      vcf_index          = small_variant_vcf_index,
+      vcf                = vcfanno.vcfanno_vcf,
+      vcf_index          = vcfanno.vcfanno_vcf_index,
       sample_metadata    = sample_metadata,
       phrank_lookup      = write_phrank.phrank_lookup,
       reference          = ref_map["fasta"],               # !FileCoercion
@@ -144,6 +266,7 @@ workflow tertiary_analysis {
       ac_expr            = slivar_ac_expr,
       info_fields        = flatten(info_fields),
       min_gq             = tertiary_map["slivar_min_gq"],
+      csq_columns        = csq_columns,
       runtime_attributes = default_runtime_attributes
   }
 
@@ -153,14 +276,14 @@ workflow tertiary_analysis {
       delimiter           = ",",
       runtime_attributes  = default_runtime_attributes
   }
-
+  
   call Utilities.split_string as split_sv_vcf_indices {
     input:
       concatenated_string = tertiary_map["svpack_pop_vcf_indices"],
       delimiter           = ",",
       runtime_attributes  = default_runtime_attributes
   }
-
+  
   call svpack_filter_annotated {
     input:
       sv_vcf                 = sv_vcf,
@@ -170,14 +293,23 @@ workflow tertiary_analysis {
       gff                    = tertiary_map["ensembl_gff"], # !FileCoercion
       runtime_attributes     = default_runtime_attributes
   }
-
+  
+  call add_anno_by_id {
+    input:
+      vcf                 = svpack_filter_annotated.svpack_vcf,
+      anno_tsv            = tertiary_map["sv_anno_tsv"],
+      anno_header         = tertiary_map["sv_anno_header"],
+      runtime_attributes  = default_runtime_attributes
+  }
+  
   call slivar_svpack_tsv {
     input:
-      filtered_vcf       = svpack_filter_annotated.svpack_vcf,
+      filtered_vcf       = add_anno_by_id.vepped_vcf,
       sample_metadata    = sample_metadata,
       lof_lookup         = tertiary_map["lof_lookup"],         # !FileCoercion
       clinvar_lookup     = tertiary_map["clinvar_lookup"],     # !FileCoercion
       phrank_lookup      = write_phrank.phrank_lookup,
+      csq_columns        = csq_columns,
       runtime_attributes = default_runtime_attributes
   }
 
@@ -195,6 +327,196 @@ workflow tertiary_analysis {
     File sv_filtered_tsv       = slivar_svpack_tsv.svpack_tsv
   }
 }
+
+## EDITED ##
+task bcftools_norm {
+  input {
+    File vcf
+    File vcf_index
+
+    File reference
+    File reference_index
+
+    RuntimeAttributes runtime_attributes
+  }
+
+  String vcf_basename = basename(vcf, ".vcf.gz")
+
+  Int threads   = 8
+  Int memory    = 4
+
+  command <<<
+    set -euo pipefail
+
+    bcftools --version
+
+    bcftools norm \
+      --threads ~{threads - 1} \
+      --multiallelics \
+      - \
+      --output-type b \
+      --fasta-ref ~{reference} \
+      ~{vcf} \
+    | bcftools view \
+      --output-type b \
+      -i 'GT!="./." && GT!="./0" && GT!="ref"' \
+    | bcftools sort \
+      --output-type z \
+      --output ~{vcf_basename}.norm.vcf.gz
+    #| bcftools view \
+    #  --output-type b \
+    #  -i 'AC > 0' \
+
+    bcftools index \
+      --threads ~{threads - 1} \
+      --tbi ~{vcf_basename}.norm.vcf.gz
+  >>>
+
+  output {
+    File norm_vcf       = "~{vcf_basename}.norm.vcf.gz"
+    File norm_vcf_index = "~{vcf_basename}.norm.vcf.gz.tbi"
+  }
+
+  runtime {
+    docker: "~{runtime_attributes.container_registry}/slivar:sha256f71a27f756e2d69ec30949cbea97c54abbafde757562a98ef965f21a28aa8eaa"
+    cpu: threads
+    memory: "${memory}GB"
+    sge_queue: runtime_attributes.sge_queue
+    preemptible: runtime_attributes.preemptible_tries
+    maxRetries: runtime_attributes.max_retries
+    awsBatchRetryAttempts: runtime_attributes.max_retries
+    zones: runtime_attributes.zones
+    cpuPlatform: runtime_attributes.cpuPlatform
+  }
+}
+############
+
+## EDITED ##
+task vcfanno {
+  input {
+    File vcf
+    File vcf_index
+    File vcf_annot_source
+    File vcf_annot_source_index
+    File lua
+    #File toml
+
+    RuntimeAttributes runtime_attributes
+  }
+
+  String vcf_basename = basename(vcf, ".vcf.gz")
+  Int threads   = 8
+  Int memory    = 4
+
+  command <<<
+    set -euo pipefail
+    echo -e "[[annotation]]\nfile=\"~{vcf_annot_source}\"\nfields = [\"AC\", \"AN\", \"CSQ\"]\nops=[\"self\", \"self\", \"self\"]\nnames=[\"ycu_ctrl_ac\", \"ycu_ctrl_an\", \"CSQ\"]\n" > tmp.toml
+
+    #vcfanno -p ~{threads} -lua ~{lua} ~{toml} ~{vcf} \
+    vcfanno -p ~{threads} -lua ~{lua} tmp.toml ~{vcf} \
+    | bcftools view \
+      --output-type z \
+      --output ~{vcf_basename}.vcfanno.vcf.gz
+
+    bcftools index \
+      --threads ~{threads - 1} \
+      --tbi ~{vcf_basename}.vcfanno.vcf.gz
+  >>>
+
+  output {
+    File vcfanno_vcf       = "~{vcf_basename}.vcfanno.vcf.gz"
+    File vcfanno_vcf_index = "~{vcf_basename}.vcfanno.vcf.gz.tbi"
+  }
+
+  runtime {
+    docker: "betelgeuse:5000/mcfonsecalab/variantutils"
+    cpu: threads
+    memory: "${memory}GB"
+    sge_queue: runtime_attributes.sge_queue
+    preemptible: runtime_attributes.preemptible_tries
+    maxRetries: runtime_attributes.max_retries
+    awsBatchRetryAttempts: runtime_attributes.max_retries
+    zones: runtime_attributes.zones
+    cpuPlatform: runtime_attributes.cpuPlatform
+  }
+}
+
+task add_anno_by_id {
+  input {
+    File vcf
+    File anno_tsv
+    File anno_header
+
+    RuntimeAttributes runtime_attributes
+  }
+
+  String vcf_basename = basename(vcf, ".vcf.gz")
+  Int threads   = 2
+  Int memory    = 16
+
+  command <<<
+    set -euo pipefail
+
+    awk '
+      BEGIN { FS=OFS="\t" }
+      NR==FNR {
+          ac[$1] = $2
+          an[$1] = $3
+          if($4=="."){
+              csq[$1] = "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
+          }else{
+              csq[$1] = $4
+          }
+          next
+      }
+      /^#/ { print; next }
+      {
+          id=$3
+          if(id in ac){
+              if($8=="." || $8==""){
+                  $8="ycu_ctrl_ac=" ac[id] ";ycu_ctrl_an=" an[id] ";CSQ=" csq[id]
+              } else {
+                  $8=$8 ";ycu_ctrl_ac=" ac[id] ";ycu_ctrl_an=" an[id] ";CSQ=" csq[id]
+              }
+          }else{
+              # 断端の元が特殊contigで相方が普通contigでもこうなるが、相方が元の行がycu_ctrlがちゃんとした数字が付くので問題ない
+              # しかし断端の両側が特殊contigなら両行がycu_ctrl "."なのでAF情報は失われてしまう
+              $8="ycu_ctrl_ac=.;ycu_ctrl_an=.;CSQ=||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
+          }
+          print
+      }
+      ' ~{anno_tsv} <(zcat ~{vcf}) > tmp.vcf
+
+    bcftools annotate \
+      -h ~{anno_header} \
+      tmp.vcf \
+      -Oz \
+      -o ~{vcf_basename}.vepped.vcf.gz
+
+    bcftools index \
+      --threads ~{threads - 1} \
+      --tbi ~{vcf_basename}.vepped.vcf.gz
+  >>>
+
+  output {
+    File vepped_vcf       = "~{vcf_basename}.vepped.vcf.gz"
+    File vepped_vcf_index = "~{vcf_basename}.vepped.vcf.gz.tbi"
+  }
+
+  runtime {
+    docker: "betelgeuse:5000/mcfonsecalab/variantutils"
+    docker: "~{runtime_attributes.container_registry}/slivar:sha256f71a27f756e2d69ec30949cbea97c54abbafde757562a98ef965f21a28aa8eaa"
+    cpu: threads
+    memory: "${memory}GB"
+    sge_queue: runtime_attributes.sge_queue
+    preemptible: runtime_attributes.preemptible_tries
+    maxRetries: runtime_attributes.max_retries
+    awsBatchRetryAttempts: runtime_attributes.max_retries
+    zones: runtime_attributes.zones
+    cpuPlatform: runtime_attributes.cpuPlatform
+  }
+}
+############
 
 task slivar_small_variant {
   meta {
@@ -290,6 +612,7 @@ task slivar_small_variant {
     Array[String] nhomalt_expr
     Array[String] ac_expr
     Array[String] info_fields
+    Array[String] csq_columns # EDITED
 
     String min_gq
 
@@ -331,7 +654,7 @@ task slivar_small_variant {
     '5_prime_UTR',
     '3_prime_UTR'
   ]
-
+  
   String vcf_basename = basename(vcf, ".vcf.gz")
 
   Int threads   = 8
@@ -347,27 +670,41 @@ task slivar_small_variant {
     cut -f1,4 ~{lof_lookup} > loeuf.lookup
     cut -f1,5 ~{lof_lookup} > loeuf_decile.lookup
 
-    bcftools --version
-
-    bcftools norm \
-      --threads ~{threads - 1} \
-      --multiallelics \
-      - \
-      --output-type b \
-      --fasta-ref ~{reference} \
-      ~{vcf} \
-    | bcftools sort \
-      --output-type b \
-      --output ~{vcf_basename}.norm.bcf
-
-    bcftools index \
-      --threads ~{threads - 1} \
-      ~{vcf_basename}.norm.bcf
+    #bcftools --version
+    #
+    #bcftools norm \
+    #  --threads ~{threads - 1} \
+    #  --multiallelics \
+    #  - \
+    #  --output-type b \
+    #  --fasta-ref ~{reference} \
+    #  ~{vcf} \
+    #| bcftools sort \
+    #  --output-type b \
+    #  --output ~{vcf_basename}.norm.bcf
+    #
+    #bcftools index \
+    #  --threads ~{threads - 1} \
+    #  ~{vcf_basename}.norm.bcf
 
     # slivar has no version option
     slivar expr 2>&1 | grep -Eo 'slivar version: [0-9.]+ [0-9a-f]+' 
 
+    ### EDITED ###
+    zcat ~{vcf} \
+    | awk -F"\t" -v OFS="\t" '/^#/{print; next}{gsub(/\//, "_", $8); print}' \
+    | bcftools view \
+      --output-type z \
+      --output ~{vcf_basename}.slash_repaired.vcf.gz
+    
+    bcftools index \
+      --threads ~{threads - 1} \
+      --tbi ~{vcf_basename}.slash_repaired.vcf.gz
+    ##############
+
+      #--vcf ~{vcf} \
     pslivar \
+      --vcf ~{vcf_basename}.slash_repaired.vcf.gz \
       --processes ~{threads} \
       --fasta ~{reference} \
       --pass-only \
@@ -377,17 +714,19 @@ task slivar_small_variant {
       --family-expr '~{sep=" && " flatten(family_dominant_expr)}' \
       --sample-expr '~{sep=" && " sample_expr}' \
       ~{sep=" " prefix("--gnotate ", gnotate_files)} \
-      --vcf ~{vcf_basename}.norm.bcf \
       --ped ~{write_tsv(sample_metadata)} \
-    | bcftools csq \
-      --local-csq \
-      --samples - \
-      --ncsq 40 \
-      --gff-annot ~{gff} \
-      --fasta-ref ~{reference} \
-      - \
+    | bcftools view \
       --output-type z \
-      --output ~{vcf_basename}.norm.slivar.vcf.gz
+      --output ~{vcf_basename}.norm.slivar.vcf.gz # EDITED (these 3 lines)
+    #| bcftools csq \
+    #  --local-csq \
+    #  --samples - \
+    #  --ncsq 40 \
+    #  --gff-annot ~{gff} \
+    #  --fasta-ref ~{reference} \
+    #  - \
+    #  --output-type z \
+    #  --output ~{vcf_basename}.norm.slivar.vcf.gz
 
     bcftools index \
       --threads ~{threads - 1} \
@@ -411,9 +750,11 @@ task slivar_small_variant {
 
     slivar tsv \
       --info-field ~{sep=' --info-field ' info_fields} \
+      -i ycu_ctrl_ac -i ycu_ctrl_an -i AQ -i QUAL \
       --sample-field dominant \
       --sample-field recessive \
-      --csq-field BCSQ \
+      --csq-field CSQ \
+      --csq-column ~{sep=' --csq-column ' csq_columns} \
       --gene-description pli.lookup \
       --gene-description oe.lookup \
       --gene-description loeuf.lookup \
@@ -424,13 +765,16 @@ task slivar_small_variant {
       --out /dev/stdout \
       ~{vcf_basename}.norm.slivar.vcf.gz \
     | sed '1 s/gene_description_1/pLI/;s/gene_description_2/oe.lof/;s/gene_description_3/LOEUF/;s/gene_description_4/LOEUF_decile/;s/gene_description_5/clinvar/;s/gene_description_6/phrank/;' \
+    | sed '1 s|gene_impact_transcript_~{sep="_" csq_columns}|gene/impact/transcript/~{sep="/" csq_columns}|;' \
     > ~{vcf_basename}.norm.slivar.tsv
 
     slivar tsv \
       --info-field ~{sep=' --info-field ' info_fields} \
+      -i ycu_ctrl_ac -i ycu_ctrl_an -i AQ -i QUAL \
       --sample-field slivar_comphet \
       --info-field slivar_comphet \
-      --csq-field BCSQ \
+      --csq-field CSQ \
+      --csq-column ~{sep=' --csq-column ' csq_columns} \
       --gene-description pli.lookup \
       --gene-description oe.lookup \
       --gene-description loeuf.lookup \
@@ -441,6 +785,7 @@ task slivar_small_variant {
       --out /dev/stdout \
       ~{vcf_basename}.norm.slivar.compound_hets.vcf.gz \
     | sed '1 s/gene_description_1/pLI/;s/gene_description_2/oe.lof/;s/gene_description_3/LOEUF/;s/gene_description_4/LOEUF_decile/;s/gene_description_5/clinvar/;s/gene_description_6/phrank/;' \
+    | sed '1 s|gene_impact_transcript_~{sep="_" csq_columns}|gene/impact/transcript/~{sep="/" csq_columns}|;' \
     > ~{vcf_basename}.norm.slivar.compound_hets.tsv
   >>>
 
@@ -609,6 +954,8 @@ task slivar_svpack_tsv {
     File clinvar_lookup
     File phrank_lookup
 
+    Array[String] csq_columns # EDITED
+
     RuntimeAttributes runtime_attributes
   }
 
@@ -637,11 +984,28 @@ task slivar_svpack_tsv {
     # slivar has no version option
     slivar expr 2>&1 | grep -Eo 'slivar version: [0-9.]+ [0-9a-f]+'
 
+    ### EDITED ###
+    zcat ~{filtered_vcf} \
+    | awk -F"\t" -v OFS="\t" '/^#/{print; next}{gsub(/\//, "_", $8); print}' \
+    | bcftools view \
+      --output-type z \
+      --output ~{filtered_vcf_basename}.slash_repaired.vcf.gz
+    
+    bcftools index \
+      --threads ~{threads - 1} \
+      --tbi ~{filtered_vcf_basename}.slash_repaired.vcf.gz
+    ##############
+
+      #--csq-field BCSQ \
+      #~{filtered_vcf} \
+    #> ~{filtered_vcf_basename}.tsv
     slivar tsv \
       --info-field ~{sep=' --info-field ' info_fields} \
+      -i ycu_ctrl_ac -i ycu_ctrl_an \
       --sample-field hetalt \
       --sample-field homalt \
-      --csq-field BCSQ \
+      --csq-field CSQ \
+      --csq-column ~{sep=' --csq-column ' csq_columns} \
       --gene-description pli.lookup \
       --gene-description oe.lookup \
       --gene-description loeuf.lookup \
@@ -650,8 +1014,9 @@ task slivar_svpack_tsv {
       --gene-description ~{phrank_lookup} \
       --ped ~{write_tsv(sample_metadata)} \
       --out /dev/stdout \
-      ~{filtered_vcf} \
+      ~{filtered_vcf_basename}.slash_repaired.vcf.gz \
     | sed '1 s/gene_description_1/pLI/;s/gene_description_2/oe.lof/;s/gene_description_3/LOEUF/;s/gene_description_4/LOEUF_decile/;s/gene_description_5/clinvar/;s/gene_description_6/phrank/;' \
+    | sed '1 s|gene_impact_transcript_~{sep="_" csq_columns}|gene/impact/transcript/~{sep="/" csq_columns}|;' \
     > ~{filtered_vcf_basename}.tsv
   >>>
 

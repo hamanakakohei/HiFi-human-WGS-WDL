@@ -105,7 +105,6 @@ task filter_trgt_catalog {
 
   Int threads   = 2
   Int mem_gb    = 4
-  Int memory    = ceil(mem_gb / threads) + 2 # edited by hamanaka
   Int disk_size = ceil(size(trgt_catalog, "GB") + 20)
 
   command <<<
@@ -133,9 +132,6 @@ task filter_trgt_catalog {
       echo "No repeats in ~{trgt_catalog} contain INCLUDE_FAIL_READS flag. fail_reads will not be used for TRGT." >> messages.txt
       rm include_fail_reads.trgt.bed
     fi
-
-    sync # edited by hamanaka
-    sleep 10 # edited by hamanaka
   >>>
 
   output {
@@ -147,9 +143,7 @@ task filter_trgt_catalog {
   runtime {
     docker: "~{runtime_attributes.container_registry}/pb_wdl_base:sha2564b889a1f21a6a7fecf18820613cf610103966a93218de772caba126ab70a8e87"
     cpu: threads
-    #memory: mem_gb + " GiB"
-    memory: "${memory}GB" # edited by hamanaka
-    sge_queue: runtime_attributes.sge_queue # edited by hamanaka
+    memory: mem_gb + " GiB"
     disk: disk_size + " GB"
     disks: "local-disk " + disk_size + " HDD"
     preemptible: runtime_attributes.preemptible_tries

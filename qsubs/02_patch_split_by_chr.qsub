@@ -1,0 +1,33 @@
+#!/bin/bash
+#$ -S /bin/bash
+#$ -N hifi_02patch_split
+#$ -cwd
+#$ -q your.q
+#$ -l h="!bad_node"
+#$ -pe OpenMP 8
+#$ -l s_vmem=4G
+#$ -o logs/02patch_split/$TASK_ID.log
+#$ -e logs/02patch_split/$TASK_ID.log
+set -euo pipefail
+
+ulimit -n 8192
+
+
+# 位置引数
+VCF=$1
+INPUT_FILE=$2
+
+
+# サンプル名とCRAMパス
+read CHR < <(sed -n "${SGE_TASK_ID}p" "$INPUT_FILE")
+
+
+# 実行
+OUT_DIR=results/02patch_split/
+mkdir -p $OUT_DIR
+
+bash scripts/02_patch_split_by_chr.sh \
+  $VCF \
+  $CHR \
+  $OUT_DIR \
+  $NSLOTS

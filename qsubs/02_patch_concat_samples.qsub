@@ -1,0 +1,31 @@
+#!/bin/bash
+#$ -S /bin/bash
+#$ -N hifi_02patch_concat
+#$ -cwd
+#$ -q your.q
+#$ -l h="!bad_node"
+#$ -pe OpenMP 4
+#$ -l s_vmem=4G
+#$ -o logs/02patch_concat/$TASK_ID.log
+#$ -e logs/02patch_concat/$TASK_ID.log
+set -euo pipefail
+
+
+# 位置引数
+INPUT_FILE=$1
+
+
+# サンプル名と染色体毎VCFのリストファイル
+read SAMPLE PER_CHR_VCF_LIST < <(sed -n "${SGE_TASK_ID}p" "$INPUT_FILE")
+
+OUT_DIR=results/02patch_concat/
+OUT_VCF=${OUT_DIR}${SAMPLE}.concat.vcf.gz 
+
+
+# 実行
+mkdir -p $OUT_DIR
+
+bash scripts/02_patch_concat_samples.sh \
+  $PER_CHR_VCF_LIST \
+  $OUT_VCF \
+  $NSLOTS

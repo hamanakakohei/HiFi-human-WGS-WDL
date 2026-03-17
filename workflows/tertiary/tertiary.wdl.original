@@ -1,6 +1,6 @@
 version 1.0
 
-import "../humanwgs_structs.edit4cohort.wdl" # EDITED
+import "../humanwgs_structs.wdl"
 import "../wdl-common/wdl/tasks/write_phrank.wdl" as Write_phrank
 import "../wdl-common/wdl/tasks/utilities.wdl" as Utilities
 
@@ -336,7 +336,6 @@ task slivar_small_variant {
 
   Int threads   = 8
   Int mem_gb    = 16
-  Int memory    = ceil(mem_gb / threads) + 2 # edited by hamanaka
   Int disk_size = ceil((size(vcf, "GB") + size(reference, "GB") + size(gnotate_files, "GB") + size(gff, "GB") + size(lof_lookup, "GB") + size(clinvar_lookup, "GB") + size(phrank_lookup, "GB")) * 2 + 20)
 
   command <<<
@@ -456,9 +455,7 @@ task slivar_small_variant {
   runtime {
     docker: "~{runtime_attributes.container_registry}/slivar:sha256f71a27f756e2d69ec30949cbea97c54abbafde757562a98ef965f21a28aa8eaa"
     cpu: threads
-    #memory: mem_gb + " GiB"
-    memory: "${memory}GB" # edited by hamanaka
-    sge_queue: runtime_attributes.sge_queue # edited by hamanaka
+    memory: mem_gb + " GiB"
     disk: disk_size + " GB"
     disks: "local-disk " + disk_size + " HDD"
     preemptible: runtime_attributes.preemptible_tries
@@ -515,7 +512,6 @@ task svpack_filter_annotated {
 
   Int threads   = 2
   Int mem_gb    = 16
-  Int memory    = ceil(mem_gb / threads) + 2 # edited by hamanaka
   Int disk_size = ceil(size(sv_vcf, "GB") * 2 + 20)
 
   String out_prefix = basename(sv_vcf, ".vcf.gz")
@@ -559,9 +555,7 @@ task svpack_filter_annotated {
   runtime {
     docker: "~{runtime_attributes.container_registry}/svpack:sha256628e9851e425ed8044a907d33de04043d1ef02d4d2b2667cf2e9a389bb011eba"
     cpu: threads
-    #memory: mem_gb + " GiB"
-    memory: "${memory}GB" # edited by hamanaka
-    sge_queue: runtime_attributes.sge_queue # edited by hamanaka
+    memory: mem_gb + " GiB"
     disk: disk_size + " GB"
     disks: "local-disk " + disk_size + " HDD"
     preemptible: runtime_attributes.preemptible_tries
@@ -623,7 +617,6 @@ task slivar_svpack_tsv {
 
   Int threads   = 2
   Int mem_gb    = 4
-  Int memory    = ceil(mem_gb / threads) + 2 # edited by hamanaka
   Int disk_size = ceil((size(filtered_vcf, "GB") + size(lof_lookup, "GB") + size(clinvar_lookup, "GB") + size(phrank_lookup, "GB")) * 2 + 20)
 
   command <<<
@@ -662,9 +655,7 @@ task slivar_svpack_tsv {
   runtime {
     docker: "~{runtime_attributes.container_registry}/slivar:sha256f71a27f756e2d69ec30949cbea97c54abbafde757562a98ef965f21a28aa8eaa"
     cpu: threads
-    #memory: mem_gb + " GiB"
-    memory: "${memory}GB" # edited by hamanaka
-    sge_queue: runtime_attributes.sge_queue # edited by hamanaka
+    memory: mem_gb + " GiB"
     disk: disk_size + " GB"
     disks: "local-disk " + disk_size + " HDD"
     preemptible: runtime_attributes.preemptible_tries
