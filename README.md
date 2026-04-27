@@ -1,11 +1,12 @@
 # 自分用に編集中のブランチ
-scripts/色々（元から合ったファイルと混在）
-qsubs/色々（01,02,03とかあるが、後々はcromwell.qsubで統一する）
-workflows/色々
-inputs/02patch/family.edit4cohort.02patch.inputs.json
-run.sh
-run_snv_only.sh
-cromwell.examples.edit.minimum.conf
+以下を作成中：
+- scripts/色々（元から合ったファイルと混在）
+- qsubs/色々（01,02,03とかあるが、後々はcromwell.qsubで統一する）
+- workflows/色々
+- inputs/02patch/family.edit4cohort.02patch.inputs.json
+- run.sh
+- run_snv_only.sh
+- cromwell.examples.edit.minimum.conf
 
 
 
